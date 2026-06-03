@@ -1,5 +1,7 @@
 let mode = 'range';
 let previewType = 'svg';
+let position = 'bottom-right';
+let showSerialText = true;
 let pdfDebounceTimer = null;
 
 const prefixInput = document.getElementById('prefix');
@@ -46,8 +48,14 @@ document.addEventListener('DOMContentLoaded', () => {
     prefixInput.addEventListener('input', updateSampleSerial);
     startInput.addEventListener('input', updateSampleSerial);
 
+    document.getElementById('toggle-serial').addEventListener('click', toggleSerialText);
+    ['bottom-right', 'bottom-left', 'top-right', 'top-left'].forEach(corner => {
+        document.getElementById(`pos-${corner}`).addEventListener('click', () => setPosition(corner));
+    });
+
     updateSampleSerial();
     updateStats();
+    updateCornerIndicator();
     updateInstantPreview();
 });
 
@@ -93,6 +101,34 @@ function setMode(newMode) {
     triggerPreviewUpdate();
 }
 
+function setPosition(newPosition) {
+    position = newPosition;
+    ['bottom-right', 'bottom-left', 'top-right', 'top-left'].forEach(corner => {
+        document.getElementById(`pos-${corner}`).classList.toggle('active', position === corner);
+    });
+    updateCornerIndicator();
+    updateStats();
+    triggerPreviewUpdate();
+}
+
+function updateCornerIndicator() {
+    const indicator = document.querySelector('.zoom-corner-indicator');
+    if (!indicator) return;
+    indicator.className = `zoom-corner-indicator ${position}`;
+    const label = indicator.querySelector('.indicator-label');
+    if (label) {
+        label.textContent = `${position.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())} Corner Focus`;
+    }
+}
+
+function toggleSerialText() {
+    showSerialText = !showSerialText;
+    const button = document.getElementById('toggle-serial');
+    button.classList.toggle('active', showSerialText);
+    button.textContent = showSerialText ? 'Hide Serial' : 'Show Serial';
+    triggerPreviewUpdate();
+}
+
 function setPreviewType(type) {
     previewType = type;
     document.getElementById('toggle-svg').classList.toggle('active', previewType === 'svg');
@@ -103,6 +139,8 @@ function setPreviewType(type) {
     
     if (previewType === 'pdf') {
         updatePdfPreview();
+    } else {
+        updateInstantPreview();
     }
 }
 
@@ -113,12 +151,14 @@ function updateStats() {
     
     if (mode === 'range') {
         const prefix = prefixInput.value || 'A';
-        const start = parseInt(startInput.value) || 0;
-        const end = parseInt(endInput.value) || 0;
-        if (end >= start) {
+        const startValue = startInput.value.trim() || '0';
+        const endValue = endInput.value.trim() || '0';
+        const start = parseInt(startValue, 10);
+        const end = parseInt(endValue, 10);
+        if (!Number.isNaN(start) && !Number.isNaN(end) && end >= start) {
             total = end - start + 1;
-            startPage = `${prefix}${start}`;
-            endPage = `${prefix}${end}`;
+            startPage = `${prefix}${startValue}`;
+            endPage = `${prefix}${endValue}`;
         }
     } else {
         const list = customListInput.value.split(',').map(s => s.trim()).filter(Boolean);
@@ -184,27 +224,31 @@ function updateInstantPreview() {
         });
         
         const barcodeWidth = parseFloat(barcodeSvg.getAttribute('width')) || 80.0;
-        const xBarcode = 595.27 - marginRight - barcodeWidth;
-        const yBarcode = 841.89 - marginBottom - barHeight;
+        const xBarcode = position.endsWith('right') ? 595.27 - marginRight - barcodeWidth : marginRight;
+        const yBarcode = position.startsWith('bottom') ? 841.89 - marginBottom - barHeight : marginBottom;
         
         barcodeSvg.setAttribute('x', xBarcode);
         barcodeSvg.setAttribute('y', yBarcode);
         
-        const xText = xBarcode - spacing;
-        const yText = 841.89 - marginBottom - (barHeight / 2);
-        
-        const textElement = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        textElement.setAttribute('x', xText);
-        textElement.setAttribute('y', yText);
-        textElement.setAttribute('font-family', fontFamily);
-        textElement.setAttribute('font-size', fontSize);
-        textElement.setAttribute('font-weight', fontWeight);
-        textElement.setAttribute('fill', '#000000');
-        textElement.setAttribute('text-anchor', 'end');
-        textElement.setAttribute('dominant-baseline', 'central');
-        textElement.textContent = serial;
-        
-        svgCanvas.appendChild(textElement);
+        if (showSerialText) {
+            const xText = position.endsWith('right') ? xBarcode - spacing : xBarcode + barcodeWidth + spacing;
+            const yText = yBarcode + barHeight / 2;
+            const textElement = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            textElement.setAttribute('x', xText);
+            textElement.setAttribute('y', yText);
+            textElement.setAttribute('font-family', fontFamily);
+            textElement.setAttribute('font-size', fontSize);
+            textElement.setAttribute('font-weight', fontWeight);
+            textElement.setAttribute('fill', '#000000');
+            textElement.setAttribute('dominant-baseline', 'central');
+            if (position.endsWith('right')) {
+                textElement.setAttribute('text-anchor', 'end');
+            } else {
+                textElement.setAttribute('text-anchor', 'start');
+            }
+            textElement.textContent = serial;
+            svgCanvas.appendChild(textElement);
+        }
     } catch (err) {
         console.error('JsBarcode drawing error:', err);
     }
@@ -221,7 +265,7 @@ function updatePdfPreview() {
     const fontSize = parseFloat(fontSizeInput.value) || 14.0;
     const spacing = parseFloat(spacingInput.value) || 15.0;
     
-    const url = `/api/preview?serial=${encodeURIComponent(serial)}&bar_width=${barWidth}&bar_height=${barHeight}&margin_right=${marginRight}&margin_bottom=${marginBottom}&font_size=${fontSize}&font_name=${encodeURIComponent(fontName)}&spacing=${spacing}&t=${Date.now()}`;
+    const url = `/api/preview?serial=${encodeURIComponent(serial)}&bar_width=${barWidth}&bar_height=${barHeight}&margin_right=${marginRight}&margin_bottom=${marginBottom}&font_size=${fontSize}&font_name=${encodeURIComponent(fontName)}&spacing=${spacing}&position=${encodeURIComponent(position)}&show_serial_text=${showSerialText}&t=${Date.now()}`;
     
     document.getElementById('pdf-preview-frame').src = url;
 }
@@ -243,13 +287,15 @@ async function downloadPDF() {
         margin_bottom: parseFloat(document.getElementById('margin_bottom').value),
         font_size: parseFloat(fontSizeInput.value),
         font_name: fontSelect.value,
-        spacing: parseFloat(spacingInput.value)
+        spacing: parseFloat(spacingInput.value),
+        position: position,
+        show_serial_text: showSerialText
     };
     
     if (mode === 'range') {
         payload.prefix = prefixInput.value || 'A';
-        payload.start = parseInt(startInput.value) || 1;
-        payload.end = parseInt(endInput.value) || 20;
+        payload.start = startInput.value || '1';
+        payload.end = endInput.value || '20';
     } else {
         payload.custom_list = customListInput.value;
     }

@@ -13,9 +13,12 @@ from rich.prompt import Prompt, Confirm, IntPrompt
 
 console = Console()
 
-def generate_pdf(output_path, serials, bar_width, bar_height, margin_right, margin_bottom, font_size, font_name, spacing, show_progress=False):
+def generate_pdf(output_path, serials, bar_width, bar_height, margin_right, margin_bottom, font_size, font_name, spacing, position='bottom-right', show_serial_text=True, show_progress=False):
     width, height = A4
     total_pages = len(serials)
+    
+    if position not in {'bottom-right', 'bottom-left', 'top-right', 'top-left'}:
+        position = 'bottom-right'
     
     if show_progress:
         summary_table = Table(title="[bold cyan]PDF Generation Config[/bold cyan]", title_justify="left", show_header=True, header_style="bold magenta")
@@ -55,21 +58,26 @@ def generate_pdf(output_path, serials, bar_width, bar_height, margin_right, marg
                 progress.update(task, description=f"[yellow]Drawing Page {idx+1}/{total_pages} ({serial_str})...")
                 
                 barcode = code128.Code128(
-                    serial_str, 
-                    barHeight=bar_height, 
-                    barWidth=bar_width, 
+                    serial_str,
+                    barHeight=bar_height,
+                    barWidth=bar_width,
                     humanReadable=0
                 )
                 
-                x_barcode = width - margin_right - barcode.width
-                y_barcode = margin_bottom
+                x_barcode = width - margin_right - barcode.width if position.endswith('right') else margin_right
+                y_barcode = margin_bottom if position.startswith('bottom') else height - margin_bottom - bar_height
                 barcode.drawOn(c, x_barcode, y_barcode)
                 
-                c.setFont(font_name, font_size)
-                x_text = x_barcode - spacing
-                cap_height = font_size * 0.7
-                y_text = y_barcode + (bar_height - cap_height) / 2
-                c.drawRightString(x_text, y_text, serial_str)
+                if show_serial_text:
+                    c.setFont(font_name, font_size)
+                    cap_height = font_size * 0.7
+                    y_text = y_barcode + (bar_height - cap_height) / 2
+                    if position.endswith('right'):
+                        x_text = x_barcode - spacing
+                        c.drawRightString(x_text, y_text, serial_str)
+                    else:
+                        x_text = x_barcode + barcode.width + spacing
+                        c.drawString(x_text, y_text, serial_str)
                 
                 progress.advance(task)
                 
@@ -94,21 +102,26 @@ def generate_pdf(output_path, serials, bar_width, bar_height, margin_right, marg
                 c.showPage()
                 
             barcode = code128.Code128(
-                serial_str, 
-                barHeight=bar_height, 
-                barWidth=bar_width, 
+                serial_str,
+                barHeight=bar_height,
+                barWidth=bar_width,
                 humanReadable=0
             )
             
-            x_barcode = width - margin_right - barcode.width
-            y_barcode = margin_bottom
+            x_barcode = width - margin_right - barcode.width if position.endswith('right') else margin_right
+            y_barcode = margin_bottom if position.startswith('bottom') else height - margin_bottom - bar_height
             barcode.drawOn(c, x_barcode, y_barcode)
             
-            c.setFont(font_name, font_size)
-            x_text = x_barcode - spacing
-            cap_height = font_size * 0.7
-            y_text = y_barcode + (bar_height - cap_height) / 2
-            c.drawRightString(x_text, y_text, serial_str)
+            if show_serial_text:
+                c.setFont(font_name, font_size)
+                cap_height = font_size * 0.7
+                y_text = y_barcode + (bar_height - cap_height) / 2
+                if position.endswith('right'):
+                    x_text = x_barcode - spacing
+                    c.drawRightString(x_text, y_text, serial_str)
+                else:
+                    x_text = x_barcode + barcode.width + spacing
+                    c.drawString(x_text, y_text, serial_str)
             
         c.save()
 

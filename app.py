@@ -1,5 +1,6 @@
 import io
 import os
+import re
 import sys
 from flask import Flask, request, send_file, render_template, jsonify
 from generator import generate_pdf
@@ -22,6 +23,8 @@ def preview_pdf():
         font_size = float(request.args.get('font_size', 14.0))
         font_name = request.args.get('font_name', 'Helvetica-Bold')
         spacing = float(request.args.get('spacing', 15.0))
+        position = request.args.get('position', 'bottom-right')
+        show_serial_text = request.args.get('show_serial_text', 'true').lower() in ['1', 'true', 'yes', 'on']
         
         pdf_buffer = io.BytesIO()
         generate_pdf(
@@ -34,6 +37,8 @@ def preview_pdf():
             font_size=font_size,
             font_name=font_name,
             spacing=spacing,
+            position=position,
+            show_serial_text=show_serial_text,
             show_progress=False
         )
         pdf_buffer.seek(0)
@@ -56,11 +61,20 @@ def generate_full_pdf():
         
         if mode == 'range':
             prefix = data.get('prefix', 'A')
-            start = int(data.get('start', 1))
-            end = int(data.get('end', 20))
-            if start > end:
+            start = str(data.get('start', '1'))
+            end = str(data.get('end', '20'))
+            if not re.fullmatch(r'\d+', start) or not re.fullmatch(r'\d+', end):
+                return jsonify({'error': 'Start and End must be numeric values.'}), 400
+            start_int = int(start)
+            end_int = int(end)
+            if start_int > end_int:
                 return jsonify({'error': 'Start number must be less than or equal to End number.'}), 400
-            serials = [f"{prefix}{num}" for num in range(start, end + 1)]
+            preserve_width = (len(start) > 1 and start.startswith('0')) or (len(end) > 1 and end.startswith('0'))
+            width = max(len(start), len(end)) if preserve_width else None
+            if width:
+                serials = [f"{prefix}{str(num).zfill(width)}" for num in range(start_int, end_int + 1)]
+            else:
+                serials = [f"{prefix}{num}" for num in range(start_int, end_int + 1)]
         else:
             custom_input = data.get('custom_list', '')
             serials = [s.strip() for s in custom_input.split(',') if s.strip()]
@@ -74,6 +88,8 @@ def generate_full_pdf():
         font_size = float(data.get('font_size', 14.0))
         font_name = data.get('font_name', 'Helvetica-Bold')
         spacing = float(data.get('spacing', 15.0))
+        position = data.get('position', 'bottom-right')
+        show_serial_text = bool(data.get('show_serial_text', True))
         
         pdf_buffer = io.BytesIO()
         generate_pdf(
@@ -86,6 +102,8 @@ def generate_full_pdf():
             font_size=font_size,
             font_name=font_name,
             spacing=spacing,
+            position=position,
+            show_serial_text=show_serial_text,
             show_progress=False
         )
         pdf_buffer.seek(0)
