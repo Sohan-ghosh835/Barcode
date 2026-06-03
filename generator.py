@@ -13,7 +13,7 @@ from rich.prompt import Prompt, Confirm, IntPrompt
 
 console = Console()
 
-def generate_pdf(output_path, serials, bar_width, bar_height, margin_right, margin_bottom, font_size, font_name, spacing, position='bottom-right', show_serial_text=True, show_progress=False):
+def generate_pdf(output_path, serials, bar_width, bar_height, margin_right, margin_bottom, font_size, font_name, spacing, position='bottom-right', show_serial_text=True, preview_guide=False, show_progress=False):
     width, height = A4
     total_pages = len(serials)
     
@@ -64,9 +64,24 @@ def generate_pdf(output_path, serials, bar_width, bar_height, margin_right, marg
                     humanReadable=0
                 )
                 
-                x_barcode = width - margin_right - barcode.width if position.endswith('right') else margin_right
+                x_barcode = width - margin_right - barcode.width + barcode.rquiet if position.endswith('right') else margin_right - barcode.lquiet
                 y_barcode = margin_bottom if position.startswith('bottom') else height - margin_bottom - bar_height
                 barcode.drawOn(c, x_barcode, y_barcode)
+                
+                if preview_guide:
+                    barcode_right = x_barcode + barcode.width - barcode.rquiet
+                    c.saveState()
+                    c.setStrokeColorRGB(1, 0, 0)
+                    c.setLineWidth(0.5)
+                    c.setDash(2, 2)
+                    y_line = y_barcode + bar_height + 2
+                    if position.endswith('right'):
+                        margin_boundary = width - margin_right
+                        c.line(barcode_right, y_line, margin_boundary, y_line)
+                    else:
+                        margin_boundary = margin_right
+                        c.line(margin_boundary, y_line, x_barcode + barcode.lquiet, y_line)
+                    c.restoreState()
                 
                 if show_serial_text:
                     c.setFont(font_name, font_size)
@@ -108,9 +123,24 @@ def generate_pdf(output_path, serials, bar_width, bar_height, margin_right, marg
                 humanReadable=0
             )
             
-            x_barcode = width - margin_right - barcode.width if position.endswith('right') else margin_right
+            x_barcode = width - margin_right - barcode.width + barcode.rquiet if position.endswith('right') else margin_right - barcode.lquiet
             y_barcode = margin_bottom if position.startswith('bottom') else height - margin_bottom - bar_height
             barcode.drawOn(c, x_barcode, y_barcode)
+            
+            if preview_guide:
+                barcode_right = x_barcode + barcode.width - barcode.rquiet
+                c.saveState()
+                c.setStrokeColorRGB(1, 0, 0)
+                c.setLineWidth(0.5)
+                c.setDash(2, 2)
+                y_line = y_barcode + bar_height + 2
+                if position.endswith('right'):
+                    margin_boundary = width - margin_right
+                    c.line(barcode_right, y_line, margin_boundary, y_line)
+                else:
+                    margin_boundary = margin_right
+                    c.line(margin_boundary, y_line, x_barcode + barcode.lquiet, y_line)
+                c.restoreState()
             
             if show_serial_text:
                 c.setFont(font_name, font_size)

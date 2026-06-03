@@ -39,6 +39,7 @@ def preview_pdf():
             spacing=spacing,
             position=position,
             show_serial_text=show_serial_text,
+            preview_guide=True,
             show_progress=False
         )
         pdf_buffer.seek(0)

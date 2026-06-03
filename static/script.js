@@ -48,7 +48,15 @@ document.addEventListener('DOMContentLoaded', () => {
     prefixInput.addEventListener('input', updateSampleSerial);
     startInput.addEventListener('input', updateSampleSerial);
 
-    document.getElementById('toggle-serial').addEventListener('click', toggleSerialText);
+    const serialCheckbox = document.getElementById('show_serial_text');
+    if (serialCheckbox) {
+        showSerialText = serialCheckbox.checked;
+        serialCheckbox.addEventListener('change', () => {
+            showSerialText = serialCheckbox.checked;
+            triggerPreviewUpdate();
+        });
+    }
+
     ['bottom-right', 'bottom-left', 'top-right', 'top-left'].forEach(corner => {
         document.getElementById(`pos-${corner}`).addEventListener('click', () => setPosition(corner));
     });
@@ -119,14 +127,6 @@ function updateCornerIndicator() {
     if (label) {
         label.textContent = `${position.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())} Corner Focus`;
     }
-}
-
-function toggleSerialText() {
-    showSerialText = !showSerialText;
-    const button = document.getElementById('toggle-serial');
-    button.classList.toggle('active', showSerialText);
-    button.textContent = showSerialText ? 'Hide Serial' : 'Show Serial';
-    triggerPreviewUpdate();
 }
 
 function setPreviewType(type) {

@@ -389,6 +389,21 @@
             color: var(--primary);
         }
 
+        .checkbox-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.95rem;
+            color: var(--text-main);
+            cursor: pointer;
+        }
+
+        .checkbox-label input {
+            width: 16px;
+            height: 16px;
+            accent-color: var(--primary);
+        }
+
         .page-viewport {
             flex: 1;
             display: flex;
@@ -623,8 +638,11 @@
                 </div>
             </div>
             <div class="form-group">
-                <label>Serial Number Text</label>
-                <button type="button" class="toggle-btn active" id="toggle-serial" onclick="toggleSerialText()">Hide Serial</button>
+                <label for="show_serial_text">Show Serial Number Text</label>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="show_serial_text" checked>
+                    <span>Visible</span>
+                </label>
             </div>
 
             <div class="form-group">
@@ -633,8 +651,8 @@
                     <span class="value-badge" id="margin_right_val">54 pt (19.0 mm)</span>
                 </div>
                 <div class="slider-container">
-                    <input type="range" id="margin_right" class="slider" min="10" max="150" step="1" value="54">
-                    <input type="number" id="margin_right_num" class="input-control number-box" min="10" max="150"
+                    <input type="range" id="margin_right" class="slider" min="5" max="150" step="1" value="54">
+                    <input type="number" id="margin_right_num" class="input-control number-box" min="5" max="150"
                         value="54">
                 </div>
             </div>
@@ -645,8 +663,8 @@
                     <span class="value-badge" id="margin_bottom_val">54 pt (19.0 mm)</span>
                 </div>
                 <div class="slider-container">
-                    <input type="range" id="margin_bottom" class="slider" min="10" max="150" step="1" value="54">
-                    <input type="number" id="margin_bottom_num" class="input-control number-box" min="10" max="150"
+                    <input type="range" id="margin_bottom" class="slider" min="5" max="150" step="1" value="54">
+                    <input type="number" id="margin_bottom_num" class="input-control number-box" min="5" max="150"
                         value="54">
                 </div>
             </div>
