@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Barcode & Serial Generator</title>
+    <!-- Google Fonts: Outfit & Inter for high-end typography -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0f111a;
+            --card-bg: rgba(26, 29, 46, 0.7);
+            --card-border: rgba(255, 255, 255, 0.08);
+            --primary: #00f2fe;
+            --primary-grad: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
+            --accent: #ff007f;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --input-bg: rgba(15, 17, 26, 0.6);
+            --input-border: rgba(255, 255, 255, 0.1);
+            --input-focus: #00f2fe;
+            --a4-ratio: 1.4142; /* A4 aspect ratio height/width */
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(79, 172, 254, 0.08) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(255, 0, 127, 0.05) 0px, transparent 50%);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        header {
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid var(--card-border);
+            background: rgba(15, 17, 26, 0.8);
+            backdrop-filter: blur(12px);
+            z-index: 10;
+        }
+
+        .header-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        h1 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.8rem;
+            font-weight: 700;
+            background: var(--primary-grad);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.5px;
+        }
+
+        .subtitle {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .container {
+            max-width: 1400px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 2rem;
+            display: grid;
+            grid-template-columns: 460px 1fr;
+            gap: 2rem;
+            flex: 1;
+        }
+
+        /* Card panels */
+        .panel {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            backdrop-filter: blur(20px);
+            padding: 1.75rem;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+            height: fit-content;
+        }
+
+        .panel-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text-main);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            padding-bottom: 0.75rem;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            background: var(--input-bg);
+            padding: 4px;
+            border-radius: 12px;
+            margin-bottom: 1.25rem;
+            border: 1px solid var(--input-border);
+        }
+
+        .tab-btn {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            padding: 8px 12px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .tab-btn.active {
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--primary);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        /* Forms */
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        label {
+            display: block;
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .input-control {
+            width: 100%;
+            background: var(--input-bg);
+            border: 1px solid var(--input-border);
+            border-radius: 10px;
+            padding: 10px 14px;
+            color: var(--text-main);
+            font-size: 0.95rem;
+            font-family: inherit;
+            transition: all 0.2s ease;
+        }
+
+        .input-control:focus {
+            outline: none;
+            border-color: var(--input-focus);
+            box-shadow: 0 0 0 3px rgba(0, 242, 254, 0.15);
+        }
+
+        textarea.input-control {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        /* Range controls with value badges */
+        .slider-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.4rem;
+        }
+
+        .value-badge {
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.8rem;
+            color: var(--primary);
+            font-weight: 600;
+            background: rgba(0, 242, 254, 0.08);
+            padding: 2px 8px;
+            border-radius: 6px;
+        }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .slider {
+            flex: 1;
+            -webkit-appearance: none;
+            appearance: none;
+            height: 6px;
+            border-radius: 3px;
+            background: var(--input-bg);
+            outline: none;
+            border: 1px solid var(--input-border);
+        }
+
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--primary);
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(0, 242, 254, 0.5);
+            transition: transform 0.1s ease;
+        }
+
+        .slider::-webkit-slider-thumb:hover {
+            transform: scale(1.15);
+        }
+
+        .number-box {
+            width: 70px;
+            text-align: center;
+            padding: 6px;
+            font-size: 0.85rem;
+        }
+
+        /* Dropdowns */
+        select.input-control {
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2394a3b8'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 14px center;
+            background-size: 16px;
+            padding-right: 40px;
+        }
+
+        /* Specific option stylings for visual font list */
+        select.input-control option {
+            background-color: #1a1d2e;
+            color: var(--text-main);
+            padding: 10px;
+        }
+        
+        option.font-helvetica { font-family: 'Arial', sans-serif; font-weight: normal; }
+        option.font-helvetica-bold { font-family: 'Arial', sans-serif; font-weight: bold; }
+        option.font-times { font-family: 'Georgia', serif; font-weight: normal; }
+        option.font-times-bold { font-family: 'Georgia', serif; font-weight: bold; }
+        option.font-courier { font-family: 'Courier New', monospace; font-weight: normal; }
+        option.font-courier-bold { font-family: 'Courier New', monospace; font-weight: bold; }
+
+        /* Buttons */
+        .btn {
+            background: var(--primary-grad);
+            color: #0f111a;
+            border: none;
+            border-radius: 12px;
+            padding: 12px 20px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            font-family: 'Outfit', sans-serif;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            box-shadow: 0 8px 20px rgba(0, 242, 254, 0.25);
+            width: 100%;
+            margin-top: 1rem;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 28px rgba(0, 242, 254, 0.4);
+            filter: brightness(1.1);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-loading {
+            pointer-events: none;
+            opacity: 0.8;
+        }
+
+        .spinner {
+            width: 18px;
+            height: 18px;
+            border: 2px solid rgba(15, 17, 26, 0.25);
+            border-top-color: #0f111a;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            display: none;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Preview area */
+        .preview-container {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .preview-toggle-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.25rem;
+        }
+
+        .toggle-group {
+            display: flex;
+            background: var(--input-bg);
+            border: 1px solid var(--input-border);
+            padding: 3px;
+            border-radius: 10px;
+        }
+
+        .toggle-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            padding: 6px 12px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            border-radius: 7px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .toggle-btn.active {
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--primary);
+        }
+
+        .page-viewport {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: rgba(10, 11, 18, 0.5);
+            border: 1px dashed rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 2rem;
+            min-height: 500px;
+            position: relative;
+        }
+
+        /* The simulated A4 page */
+        .a4-page {
+            width: 100%;
+            max-width: 440px;
+            aspect-ratio: 0.707; /* 1 / 1.414 */
+            background-color: #ffffff;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
+            border-radius: 4px;
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.2s ease;
+        }
+
+        /* Corner outline zoom indicator */
+        .zoom-corner-indicator {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 180px;
+            height: 90px;
+            border: 1.5px dashed var(--accent);
+            pointer-events: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .zoom-corner-indicator::before {
+            content: "Bottom Right Corner Focus";
+            font-size: 9px;
+            color: var(--accent);
+            background: #ffffff;
+            padding: 2px 6px;
+            border-radius: 4px;
+            position: absolute;
+            top: -9px;
+            left: 10px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        /* Vector rendering container inside the A4 bottom right */
+        .bottom-right-container {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        /* SVG rendering */
+        .preview-svg {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+
+        /* Exact PDF preview frame */
+        .pdf-frame {
+            width: 100%;
+            height: 100%;
+            border: none;
+            border-radius: 12px;
+            background: #ffffff;
+            display: none;
+        }
+
+        /* Quick helper cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            margin-top: 1.25rem;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            border-radius: 12px;
+            padding: 10px;
+            text-align: center;
+        }
+
+        .stat-label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            margin-bottom: 2px;
+        }
+
+        .stat-value {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        /* Info boxes */
+        .info-box {
+            background: rgba(0, 242, 254, 0.04);
+            border: 1px solid rgba(0, 242, 254, 0.1);
+            border-radius: 12px;
+            padding: 10px 14px;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 1rem;
+            line-height: 1.4;
+        }
+
+        .info-box strong {
+            color: var(--primary);
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-container">
+            <div>
+                <h1>PDF Barcode & Serial Generator</h1>
+                <div class="subtitle">Blank A4 pages with bottom-right Code 128 barcodes and serials</div>
+            </div>
+            <div class="value-badge" style="font-size: 0.9rem; padding: 4px 12px;">A4 Page Layout</div>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- Settings Sidebar -->
+        <div class="panel">
+            <div class="panel-title">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--primary);"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                Configure Settings
+            </div>
+
+            <!-- Serial Mode Selection -->
+            <div class="tabs">
+                <button type="button" class="tab-btn active" id="tab-range" onclick="setMode('range')">Sequential Range</button>
+                <button type="button" class="tab-btn" id="tab-custom" onclick="setMode('custom')">Custom List</button>
+            </div>
+
+            <!-- Serial Forms -->
+            <div id="range-inputs">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="prefix">Serial Prefix</label>
+                        <input type="text" id="prefix" class="input-control" value="A">
+                    </div>
+                    <div class="form-group">
+                        <label for="preview-serial">Sample Page Serial</label>
+                        <input type="text" id="preview-serial" class="input-control" value="A80" title="This serial will be used on the live preview page">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="start">Start Number</label>
+                        <input type="number" id="start" class="input-control" value="80" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="end">End Number</label>
+                        <input type="number" id="end" class="input-control" value="100" min="0">
+                    </div>
+                </div>
+            </div>
+
+            <div id="custom-inputs" style="display: none;">
+                <div class="form-group">
+                    <label for="custom_list">Custom Serial List (comma separated)</label>
+                    <textarea id="custom_list" class="input-control" placeholder="A1, B5, C12, TEST99">A80, A81, A82</textarea>
+                </div>
+            </div>
+
+            <!-- Layout Configuration -->
+            <div class="panel-title" style="margin-top: 1rem; font-size: 1.1rem;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--primary);"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line></svg>
+                Layout Parameters
+            </div>
+
+            <!-- Margins -->
+            <div class="form-group">
+                <div class="slider-header">
+                    <label for="margin_right">Right Margin (pt / mm)</label>
+                    <span class="value-badge" id="margin_right_val">54 pt (19.0 mm)</span>
+                </div>
+                <div class="slider-container">
+                    <input type="range" id="margin_right" class="slider" min="10" max="150" step="1" value="54">
+                    <input type="number" id="margin_right_num" class="input-control number-box" min="10" max="150" value="54">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <div class="slider-header">
+                    <label for="margin_bottom">Bottom Margin (pt / mm)</label>
+                    <span class="value-badge" id="margin_bottom_val">54 pt (19.0 mm)</span>
+                </div>
+                <div class="slider-container">
+                    <input type="range" id="margin_bottom" class="slider" min="10" max="150" step="1" value="54">
+                    <input type="number" id="margin_bottom_num" class="input-control number-box" min="10" max="150" value="54">
+                </div>
+            </div>
+
+            <!-- Barcode dimensions -->
+            <div class="form-group">
+                <div class="slider-header">
+                    <label for="bar_height">Barcode Height (pt / mm)</label>
+                    <span class="value-badge" id="bar_height_val">30 pt (10.6 mm)</span>
+                </div>
+                <div class="slider-container">
+                    <input type="range" id="bar_height" class="slider" min="10" max="100" step="1" value="30">
+                    <input type="number" id="bar_height_num" class="input-control number-box" min="10" max="100" value="30">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <div class="slider-header">
+                    <label for="bar_width">Narrow Bar Width (pt)</label>
+                    <span class="value-badge" id="bar_width_val">1.2 pt</span>
+                </div>
+                <div class="slider-container">
+                    <input type="range" id="bar_width" class="slider" min="0.5" max="3" step="0.1" value="1.2">
+                    <input type="number" id="bar_width_num" class="input-control number-box" min="0.5" max="3" step="0.1" value="1.2">
+                </div>
+            </div>
+
+            <!-- Typography -->
+            <div class="form-group">
+                <label for="font_name">Font Selection (Visual Preview)</label>
+                <select id="font_name" class="input-control">
+                    <option class="font-helvetica-bold" value="Helvetica-Bold" selected>Helvetica Bold</option>
+                    <option class="font-helvetica" value="Helvetica">Helvetica Standard</option>
+                    <option class="font-times-bold" value="Times-Bold">Times Bold</option>
+                    <option class="font-times" value="Times-Roman">Times Standard</option>
+                    <option class="font-courier-bold" value="Courier-Bold">Courier Bold</option>
+                    <option class="font-courier" value="Courier">Courier Standard</option>
+                </select>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <div class="slider-header">
+                        <label for="font_size">Font Size (pt)</label>
+                    </div>
+                    <div class="slider-container">
+                        <input type="number" id="font_size" class="input-control" min="6" max="36" value="14">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <div class="slider-header">
+                        <label for="spacing">Spacing (pt)</label>
+                    </div>
+                    <div class="slider-container">
+                        <input type="number" id="spacing" class="input-control" min="0" max="100" value="15">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Generate/Download Button -->
+            <button id="download-btn" class="btn" onclick="downloadPDF()">
+                <div class="spinner" id="btn-spinner"></div>
+                <svg id="btn-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                Generate & Download PDF
+            </button>
+        </div>
+
+        <!-- Preview Panel -->
+        <div class="panel preview-container">
+            <div class="preview-toggle-bar">
+                <div class="panel-title" style="margin-bottom: 0; border-bottom: none; padding-bottom: 0;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--primary);"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                    Live Visual Layout
+                </div>
+                
+                <div class="toggle-group">
+                    <button class="toggle-btn active" id="toggle-svg" onclick="setPreviewType('svg')">Instant Canvas</button>
+                    <button class="toggle-btn" id="toggle-pdf" onclick="setPreviewType('pdf')">Exact PDF Render</button>
+                </div>
+            </div>
+
+            <!-- Page Viewport -->
+            <div class="page-viewport">
+                <!-- 1. Simulated A4 page with SVG vector overlay -->
+                <div class="a4-page" id="svg-preview-page">
+                    <div class="zoom-corner-indicator"></div>
+                    <div class="bottom-right-container">
+                        <svg class="preview-svg" id="svg-canvas" viewBox="0 0 595.27 841.89" xmlns="http://www.w3.org/2000/svg">
+                            <!-- We will render the elements dynamically in JS -->
+                        </svg>
+                    </div>
+                </div>
+
+                <!-- 2. The PDF rendering inside an iframe (initially hidden) -->
+                <iframe class="pdf-frame" id="pdf-preview-frame"></iframe>
+            </div>
+
+            <!-- Stats & Diagnostics -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Total Pages</div>
+                    <div class="stat-value" id="stat-total-pages">21</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Start Page</div>
+                    <div class="stat-value" id="stat-start-page">A80</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">End Page</div>
+                    <div class="stat-value" id="stat-end-page">A100</div>
+                </div>
+            </div>
+
+            <div class="info-box">
+                💡 <strong>Instant Canvas</strong> runs in the browser for ultra-fast positioning with zero lag. Toggle to <strong>Exact PDF Render</strong> to verify the final vector PDF generated by ReportLab.
+            </div>
+        </div>
+    </div>
+
+    <!-- Script assets -->
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+    <script src="/static/script.js"></script>
+</body>
+</html>
