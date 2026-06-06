@@ -3,7 +3,7 @@ import os
 import re
 import sys
 from flask import Flask, request, send_file, render_template, jsonify
-from generator import generate_pdf
+from generator import generate_pdf, _build_a3_pairs
 
 app = Flask(__name__, template_folder='templates', static_folder='static')
 
@@ -13,7 +13,6 @@ def index():
 
 @app.route('/api/preview', methods=['GET'])
 def preview_pdf():
-    """Generates a single-page PDF preview based on configuration."""
     try:
         serial = request.args.get('serial', 'A80')
         bar_width = float(request.args.get('bar_width', 1.2))
@@ -25,11 +24,18 @@ def preview_pdf():
         spacing = float(request.args.get('spacing', 15.0))
         position = request.args.get('position', 'bottom-right')
         show_serial_text = request.args.get('show_serial_text', 'true').lower() in ['1', 'true', 'yes', 'on']
-        
+        page_layout = request.args.get('page_layout', 'a4')
+        serial2 = request.args.get('serial2', None)
+
+        if page_layout == 'a3' and serial2:
+            serials = [serial, serial2]
+        else:
+            serials = [serial]
+
         pdf_buffer = io.BytesIO()
         generate_pdf(
             output_path=pdf_buffer,
-            serials=[serial],
+            serials=serials,
             bar_width=bar_width,
             bar_height=bar_height,
             margin_right=margin_right,
@@ -39,11 +45,11 @@ def preview_pdf():
             spacing=spacing,
             position=position,
             show_serial_text=show_serial_text,
-            preview_guide=True,
-            show_progress=False
+            show_progress=False,
+            page_layout=page_layout
         )
         pdf_buffer.seek(0)
-        
+
         return send_file(
             pdf_buffer,
             mimetype='application/pdf',
@@ -54,12 +60,12 @@ def preview_pdf():
 
 @app.route('/api/generate', methods=['POST'])
 def generate_full_pdf():
-    """Generates the full multi-page PDF based on sequential or custom serials."""
     try:
         data = request.json or {}
         mode = data.get('mode', 'range')
+        page_layout = data.get('page_layout', 'a4')
         serials = []
-        
+
         if mode == 'range':
             prefix = data.get('prefix', 'A')
             start = str(data.get('start', '1'))
@@ -81,7 +87,7 @@ def generate_full_pdf():
             serials = [s.strip() for s in custom_input.split(',') if s.strip()]
             if not serials:
                 return jsonify({'error': 'Custom serial list cannot be empty.'}), 400
-                
+
         bar_width = float(data.get('bar_width', 1.2))
         bar_height = float(data.get('bar_height', 30.0))
         margin_right = float(data.get('margin_right', 54.0))
@@ -91,7 +97,7 @@ def generate_full_pdf():
         spacing = float(data.get('spacing', 15.0))
         position = data.get('position', 'bottom-right')
         show_serial_text = bool(data.get('show_serial_text', True))
-        
+
         pdf_buffer = io.BytesIO()
         generate_pdf(
             output_path=pdf_buffer,
@@ -105,11 +111,13 @@ def generate_full_pdf():
             spacing=spacing,
             position=position,
             show_serial_text=show_serial_text,
-            show_progress=False
+            show_progress=False,
+            page_layout=page_layout
         )
         pdf_buffer.seek(0)
-        
-        filename = f"barcoded_{serials[0]}_to_{serials[-1]}.pdf" if len(serials) > 1 else f"barcoded_{serials[0]}.pdf"
+
+        layout_tag = 'a3' if page_layout == 'a3' else 'a4'
+        filename = f"barcoded_{layout_tag}_{serials[0]}_to_{serials[-1]}.pdf" if len(serials) > 1 else f"barcoded_{layout_tag}_{serials[0]}.pdf"
         return send_file(
             pdf_buffer,
             mimetype='application/pdf',
