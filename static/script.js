@@ -75,6 +75,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    document.getElementById('chunk_size').addEventListener('change', () => {
+        updateStats();
+    });
+    document.getElementById('download_format').addEventListener('change', () => {
+        updateStats();
+    });
+
     updateSampleSerial();
     updateStats();
     updateCornerIndicator();
@@ -294,6 +301,48 @@ function updateStats() {
 
     document.getElementById('stat-start-page').textContent = startPage;
     document.getElementById('stat-end-page').textContent = endPage;
+    updateDownloadFormatWarnings();
+}
+
+function updateDownloadFormatWarnings() {
+    let total = 0;
+    if (mode === 'range') {
+        const start = parseInt(startInput.value.trim() || '0', 10);
+        const end = parseInt(endInput.value.trim() || '0', 10);
+        if (!Number.isNaN(start) && !Number.isNaN(end) && end >= start) {
+            total = end - start + 1;
+        }
+    } else {
+        total = customListInput.value.split(',').map(s => s.trim()).filter(Boolean).length;
+    }
+
+    const pages = pageLayout === 'a3' ? Math.ceil(total / 2) : total;
+    const chunkSize = parseInt(document.getElementById('chunk_size').value) || 50000;
+    const formatWarning = document.getElementById('format-warning');
+    const formatSelect = document.getElementById('download_format');
+    if (!formatSelect) return;
+    const pdfOption = formatSelect.querySelector('option[value="pdf"]');
+
+    if (pages > chunkSize) {
+        formatWarning.style.display = 'block';
+        formatWarning.innerHTML = `⚠️ Run size (${pages.toLocaleString()} pages) exceeds chunk size (${chunkSize.toLocaleString()}). Will be zipped in parts to avoid crashes.`;
+        
+        // If it's too large, disable Single PDF option entirely
+        if (pages > 100000) {
+            pdfOption.disabled = true;
+            pdfOption.text = "Always Single PDF (Disabled - Too Large)";
+            if (formatSelect.value === 'pdf') {
+                formatSelect.value = 'auto';
+            }
+        } else {
+            pdfOption.disabled = false;
+            pdfOption.text = "Always Single PDF";
+        }
+    } else {
+        formatWarning.style.display = 'none';
+        pdfOption.disabled = false;
+        pdfOption.text = "Always Single PDF";
+    }
 }
 
 function triggerPreviewUpdate() {
@@ -460,15 +509,7 @@ function updatePdfPreview() {
     document.getElementById('pdf-preview-frame').src = url;
 }
 
-async function downloadPDF() {
-    const btn = document.getElementById('download-btn');
-    const spinner = document.getElementById('btn-spinner');
-    const icon = document.getElementById('btn-icon');
-
-    btn.classList.add('btn-loading');
-    spinner.style.display = 'block';
-    icon.style.display = 'none';
-
+function _buildPayload() {
     const payload = {
         mode: mode,
         bar_width: parseFloat(document.getElementById('bar_width').value),
@@ -480,9 +521,10 @@ async function downloadPDF() {
         spacing: parseFloat(spacingInput.value),
         position: position,
         show_serial_text: showSerialText,
-        page_layout: pageLayout
+        page_layout: pageLayout,
+        chunk_size: parseInt(document.getElementById('chunk_size').value) || 50000,
+        download_format: document.getElementById('download_format').value || 'auto'
     };
-
     if (mode === 'range') {
         payload.prefix = prefixInput.value || 'A';
         payload.start = startInput.value || '1';
@@ -490,44 +532,111 @@ async function downloadPDF() {
     } else {
         payload.custom_list = customListInput.value;
     }
+    return payload;
+}
+
+function _setJobUI(active, progressPct, statusText, isError) {
+    const btn = document.getElementById('download-btn');
+    const icon = document.getElementById('btn-icon');
+    const spinner = document.getElementById('btn-spinner');
+    const progressWrap = document.getElementById('job-progress-wrap');
+    const progressBar = document.getElementById('job-progress-bar');
+    const progressLabel = document.getElementById('job-progress-label');
+    const progressPctEl = document.getElementById('job-progress-pct');
+
+    if (active) {
+        btn.classList.add('btn-loading');
+        spinner.style.display = 'block';
+        icon.style.display = 'none';
+        progressWrap.style.display = 'block';
+        progressBar.style.width = progressPct + '%';
+        progressBar.style.background = isError
+            ? 'linear-gradient(135deg, #ff4444 0%, #cc0000 100%)'
+            : 'var(--primary-grad)';
+        progressLabel.textContent = statusText;
+        progressPctEl.textContent = isError ? '' : Math.round(progressPct) + '%';
+    } else {
+        btn.classList.remove('btn-loading');
+        spinner.style.display = 'none';
+        icon.style.display = 'block';
+        progressWrap.style.display = 'none';
+        progressBar.style.width = '0%';
+        progressLabel.textContent = '';
+        progressPctEl.textContent = '';
+    }
+}
+
+async function downloadPDF() {
+    const payload = _buildPayload();
+
+    _setJobUI(true, 0, 'Starting job…', false);
+
+    let jobId = null;
+    let pollTimer = null;
 
     try {
-        const response = await fetch('/api/generate', {
+        const startResp = await fetch('/api/generate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
 
-        if (!response.ok) {
-            const errData = await response.json();
-            throw new Error(errData.error || 'Failed to generate PDF');
-        }
+        const startData = await startResp.json();
+        if (!startResp.ok) throw new Error(startData.error || 'Failed to start job');
 
-        let filename = 'barcoded_output.pdf';
-        const disposition = response.headers.get('Content-Disposition');
-        if (disposition && disposition.indexOf('attachment') !== -1) {
-            const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
-            const matches = filenameRegex.exec(disposition);
-            if (matches != null && matches[1]) {
-                filename = matches[1].replace(/["]/g, '');
-            }
-        }
+        jobId = startData.job_id;
+        const jobTotal = startData.total || 1;
 
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
+        await new Promise((resolve, reject) => {
+            pollTimer = setInterval(async () => {
+                try {
+                    const statusResp = await fetch(`/api/status/${jobId}`);
+                    const statusData = await statusResp.json();
+
+                    if (!statusResp.ok) {
+                        clearInterval(pollTimer);
+                        reject(new Error(statusData.error || 'Status check failed'));
+                        return;
+                    }
+
+                    const pct = jobTotal > 0 ? (statusData.progress / jobTotal) * 100 : 0;
+                    const pagesLabel = statusData.total > 0
+                        ? `Generating… ${statusData.progress.toLocaleString()} / ${statusData.total.toLocaleString()} pages`
+                        : 'Generating…';
+
+                    if (statusData.status === 'done') {
+                        clearInterval(pollTimer);
+                        _setJobUI(true, 100, 'Preparing download…', false);
+                        resolve();
+                    } else if (statusData.status === 'error') {
+                        clearInterval(pollTimer);
+                        reject(new Error(statusData.error || 'Generation failed'));
+                    } else {
+                        _setJobUI(true, pct, pagesLabel, false);
+                    }
+                } catch (pollErr) {
+                    clearInterval(pollTimer);
+                    reject(pollErr);
+                }
+            }, 800);
+        });
+
+        _setJobUI(true, 100, 'Downloading…', false);
+
         const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
+        a.href = `/api/download/${jobId}`;
         document.body.appendChild(a);
         a.click();
         a.remove();
-        window.URL.revokeObjectURL(url);
+
+        // Let the browser show the download started and reset the UI after 3 seconds
+        setTimeout(() => {
+            _setJobUI(false, 0, '', false);
+        }, 3000);
 
     } catch (err) {
-        alert('Error generating PDF: ' + err.message);
-    } finally {
-        btn.classList.remove('btn-loading');
-        spinner.style.display = 'none';
-        icon.style.display = 'block';
+        if (pollTimer) clearInterval(pollTimer);
+        _setJobUI(true, 100, 'Error: ' + err.message, true);
+        setTimeout(() => _setJobUI(false, 0, '', false), 4000);
     }
 }

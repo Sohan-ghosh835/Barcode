@@ -58,7 +58,7 @@ def _build_a3_pairs(serials):
 
 def generate_pdf(output_path, serials, bar_width, bar_height, margin_right, margin_bottom,
                  font_size, font_name, spacing, position='bottom-right', show_serial_text=True,
-                 show_progress=False, page_layout='a4'):
+                 show_progress=False, page_layout='a4', progress_callback=None):
 
     if position not in {'bottom-right', 'bottom-left', 'top-right', 'top-left'}:
         position = 'bottom-right'
@@ -166,6 +166,8 @@ def generate_pdf(output_path, serials, bar_width, bar_height, margin_right, marg
                         font_size, font_name, spacing, position, show_serial_text,
                         half_width, page_height, x_offset=half_width
                     )
+                if progress_callback and (sheet_idx % 100 == 0 or sheet_idx == sheet_count - 1):
+                    progress_callback(sheet_idx + 1, sheet_count)
         else:
             for idx, serial_str in enumerate(serials):
                 if idx > 0:
@@ -175,6 +177,8 @@ def generate_pdf(output_path, serials, bar_width, bar_height, margin_right, marg
                     font_size, font_name, spacing, position, show_serial_text,
                     page_width, page_height, x_offset=0
                 )
+                if progress_callback and (idx % 100 == 0 or idx == sheet_count - 1):
+                    progress_callback(idx + 1, sheet_count)
         c.save()
 
 
